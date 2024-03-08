@@ -9,44 +9,57 @@ class Server:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(self.addr)
         self.server_socket.listen()
-        self.player_positions = [(50, 50), (450, 50), (50, 450), (450, 450)]  # Default positions for up to 4 players
+        self.player_positions = [(50, 50), (450, 50), (50, 450), (450, 450)]
+        self.available_players = [1, 2, 3, 4]
 
     def broadcast(self, message):
-        for client in self.clients:
-            client.send(message)
-
-    def handle_client(self, client, player_id):
-        # Send initial player positions along with the client's player ID
-        initial_data = [player_id] + [self.player_positions]  # Corrected to send as a list
-        client.send(pickle.dumps(initial_data))
-        
-        while True:
+        for client in self.clients[:]:  # Iterate over a copy to avoid modification errors
             try:
+                client.send(message)
+            except Exception as e:  # Catch any exception to avoid server crash
+                print(f"Broadcast error: {e}")
+                client.close()
+                self.clients.remove(client)
+
+    def handle_client(self, client):
+        try:
+            while True:
                 data = client.recv(1024)
                 if not data:
                     break
-                _, position_update = pickle.loads(data)  # Receive position update
-                self.player_positions[player_id] = position_update  # Update specific player's position
+                message_type, message_content = pickle.loads(data)
                 
-                # Broadcast updated positions to all clients
-                self.broadcast(pickle.dumps(self.player_positions))
-            except:
-                self.clients.remove(client)
-                client.close()
-                print(f"Player {player_id} disconnected.")
-                break
+                # Process player number requests and position updates
+                if message_type == 'request_player_number':
+                    if message_content in self.available_players:
+                        self.available_players.remove(message_content)
+                        client.send(pickle.dumps(('player_number_confirmed', message_content)))
+                        # Broadcast updated game state to all clients
+                        self.broadcast(pickle.dumps(self.player_positions))
+                    else:
+                        client.send(pickle.dumps(('player_number_error', 'Unavailable')))
+                elif message_type == 'update_position':
+                    # Update the specific player's position
+                    player_id, new_position = message_content
+                    self.player_positions[player_id - 1] = new_position
+                    # Broadcast the updated game state
+                    self.broadcast(pickle.dumps(self.player_positions))
 
+                # Broadcast the updated game state after processing
+                self.broadcast(pickle.dumps(self.player_positions))
+        except Exception as e:
+            print(f"Client error: {e}")
+        finally:
+            client.close()
+            if client in self.clients:  # Safely remove the client
+                self.clients.remove(client)
 
     def start(self):
         print("Server started. Waiting for connections...")
-        player_id = 0
         while True:
             client, _ = self.server_socket.accept()
-            print(f"Player {player_id} connected.")
             self.clients.append(client)
-            
-            threading.Thread(target=self.handle_client, args=(client, player_id)).start()
-            player_id += 1  # Increment player_id for the next connection
+            threading.Thread(target=self.handle_client, args=(client,)).start()
 
 if __name__ == "__main__":
     server = Server()
