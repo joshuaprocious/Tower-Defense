@@ -5,16 +5,51 @@ import sys
 import threading
 import time
 
+'''def get_local_ip():
+    try:
+        # Attempt to connect to an external address (does not need to be reachable)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]  # Get the IP address of the socket's local endpoint
+        s.close()
+        return local_ip
+    except Exception as e:
+        print(f"Error obtaining local IP: {e}")
+        return None
+
+# Example usage
+local_ip = get_local_ip()
+if local_ip:
+    print(f"Local IP Address: {local_ip}")
+else:
+    print("Could not obtain local IP address.")
+
+get_local_ip()'''
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, color, initial_position):
         super().__init__()
-        self.image = pygame.Surface((10, 10))  # Size of the player
+        self.image = pygame.Surface((10, 10))
         self.image.fill(color)
         self.rect = self.image.get_rect(topleft=initial_position)
+        # For interpolation
+        self.previous_position = initial_position
+        self.current_position = initial_position
+        self.previous_time = time.time()
+        self.current_time = time.time()
 
     def update(self, new_position):
-        self.rect.topleft = new_position
+        # Update positions for interpolation
+        self.previous_position = self.current_position
+        self.current_position = new_position
+        self.previous_time = self.current_time
+        self.current_time = time.time()
 
+    def interpolate(self, alpha):
+        # Linear interpolation between previous and current position - smoother client rendering
+        new_x = self.previous_position[0] + (self.current_position[0] - self.previous_position[0]) * alpha
+        new_y = self.previous_position[1] + (self.current_position[1] - self.previous_position[1]) * alpha
+        self.rect.topleft = (new_x, new_y)
 class Client:
     def __init__(self, address='127.0.0.1', port=12345):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -42,7 +77,7 @@ class Client:
     def receive_data(self):
         while True:
             try:
-                data = self.client_socket.recv(4096)
+                data = self.client_socket.recv(1024)
                 if not data:
                     break
                 try:
@@ -96,9 +131,13 @@ class Client:
                     sys.exit()
 
             screen.fill((0, 0, 0))  # Ensure this is at the start of the loop to clear the screen each frame
-            
+            current_time = time.time()
             if self.game_state_content and self.player_id is not None:
-                
+                for player_sprite in self.player_sprites.values():
+                    time_since_update = current_time - player_sprite.current_time
+                    # Assuming updates come roughly every 1/60 seconds; adjust as necessary
+                    alpha = min(time_since_update * 60, 1)
+                    player_sprite.interpolate(alpha)
                 #print('message data: ' + str(self.game_state_content) + ' player id: '+ str(self.player_id) + ' player number: ' + str(self.player_number))
                 keys = pygame.key.get_pressed()
                 # Initialize x and y with current player's position to maintain it if no key is pressed
