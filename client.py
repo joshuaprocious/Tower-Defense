@@ -68,7 +68,7 @@ class Client:
             elif message_type == 'game_state_update':
                 self.game_state_content = message_data # message_data is the variable which contains type and related data (ie. {'player_position': {1: {'x': 250, 'y': 250}}})
                 self.update_player_sprites()  # Update player sprites based on game state
-                print('Game state message:', self.game_state_content)
+                print('Game state content:', self.game_state_content)
             else:
                 print("Unexpected message type received:", message_type)
 
@@ -138,6 +138,7 @@ class Client:
 
                 # Draw all players
                 self.players.draw(screen)  # Draw all player sprites in the group
+                #the commented code was before addition of sprite groups for player
                 '''for player_number, pos in self.game_state_content['player_position'].items():
                     color = self.colors[(player_number - 1) % len(self.colors)]  # Adjust color based on player number
                     pygame.draw.rect(screen, color, (pos['x'], pos['y'], 10, 10))'''

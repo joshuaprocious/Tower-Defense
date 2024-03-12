@@ -56,11 +56,12 @@ class GameState:
                 print(f"Broadcast error: {e}")
 
     def update_and_broadcast(self):
-        # Prepare the game state update message
-        message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content}
-        print('broadcasting game_state_update: ' + str(message))
-        self.broadcast(message)
-        #self.game_entities.broadcast_content = None
+        with self.lock:
+            # Prepare the game state update message
+            message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content}
+            print('broadcasting game_state_update: ' + str(message))
+            self.broadcast(message)
+            #self.game_entities.broadcast_content = None
 
     def update_loop(self):
         while True:
