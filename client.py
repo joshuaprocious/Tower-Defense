@@ -5,6 +5,16 @@ import sys
 import threading
 import time
 
+class Player(pygame.sprite.Sprite):
+    def __init__(self, color, initial_position):
+        super().__init__()
+        self.image = pygame.Surface((10, 10))  # Size of the player
+        self.image.fill(color)
+        self.rect = self.image.get_rect(topleft=initial_position)
+
+    def update(self, new_position):
+        self.rect.topleft = new_position
+
 class Client:
     def __init__(self, address='127.0.0.1', port=12345):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -15,6 +25,9 @@ class Client:
         self.colors = [(0, 255, 0), (0, 0, 255), (255, 0, 0), (255, 255, 0)]
         threading.Thread(target=self.receive_data, daemon=True).start()
         self.lock = threading.Lock()  # Initialize a lock
+        self.players = pygame.sprite.Group()  # This will hold all player sprites
+        self.player_sprites = {}  # Maps player numbers to their sprite objects
+
 
     def send_message(self, message_type, data):
         with self.lock:
@@ -54,9 +67,22 @@ class Client:
                 print(f"Player ID {self.player_id} and Number {self.player_number} confirmed by server.")
             elif message_type == 'game_state_update':
                 self.game_state_content = message_data # message_data is the variable which contains type and related data (ie. {'player_position': {1: {'x': 250, 'y': 250}}})
+                self.update_player_sprites()  # Update player sprites based on game state
                 print('Game state message:', self.game_state_content)
             else:
                 print("Unexpected message type received:", message_type)
+
+    def update_player_sprites(self):
+        for player_number, pos in self.game_state_content['player_position'].items():
+            if player_number not in self.player_sprites:
+                # Create a new player sprite if it doesn't exist
+                color = self.colors[(player_number - 1) % len(self.colors)]
+                player_sprite = Player(color, (pos['x'], pos['y']))
+                self.players.add(player_sprite)
+                self.player_sprites[player_number] = player_sprite
+            else:
+                # Update existing sprite position
+                self.player_sprites[player_number].update((pos['x'], pos['y']))
 
     def game_loop(self):
         pygame.init()
@@ -81,17 +107,27 @@ class Client:
 
                 position_changed = False
 
+                # Define the base speed
+                base_speed = 3
+
+                # Check if the Shift key is pressed (either left or right)
+                shift_pressed = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+
+                # Calculate the movement speed based on whether Shift is pressed
+                movement_speed = base_speed + 5 if shift_pressed else base_speed
+
+                # Apply the movement speed to the movement logic
                 if keys[pygame.K_LEFT]:
-                    x -= 5
+                    x -= movement_speed
                     position_changed = True
                 if keys[pygame.K_RIGHT]:
-                    x += 5
+                    x += movement_speed
                     position_changed = True
                 if keys[pygame.K_UP]:
-                    y -= 5
+                    y -= movement_speed
                     position_changed = True
                 if keys[pygame.K_DOWN]:
-                    y += 5
+                    y += movement_speed
                     position_changed = True
 
                 if position_changed:
@@ -101,9 +137,10 @@ class Client:
                     self.game_state_content['player_position'][self.player_number] = position_dict
 
                 # Draw all players
-                for player_number, pos in self.game_state_content['player_position'].items():
+                self.players.draw(screen)  # Draw all player sprites in the group
+                '''for player_number, pos in self.game_state_content['player_position'].items():
                     color = self.colors[(player_number - 1) % len(self.colors)]  # Adjust color based on player number
-                    pygame.draw.rect(screen, color, (pos['x'], pos['y'], 50, 50))
+                    pygame.draw.rect(screen, color, (pos['x'], pos['y'], 10, 10))'''
                     
             pygame.display.flip()
             clock.tick(60)
