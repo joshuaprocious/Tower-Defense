@@ -16,7 +16,7 @@ pygame.init()
 pygame.font.init()
 
 # Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = 1080, 920
+SCREEN_WIDTH, SCREEN_HEIGHT = 1440, 1080
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 # Colors and Fonts
