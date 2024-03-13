@@ -62,7 +62,12 @@ class Client:
         self.lock = threading.Lock()  # Initialize a lock
         self.players = pygame.sprite.Group()  # This will hold all player sprites
         self.player_sprites = {}  # Maps player numbers to their sprite objects
+        self.request_join()
 
+
+    def request_join(self):
+        # This method sends a join request to the server.
+        self.send_message('request_player_join', {'data': 'requesting access to join game'})  # Assuming you have a method to send messages
 
     def send_message(self, message_type, data):
         with self.lock:

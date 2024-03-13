@@ -78,7 +78,7 @@ class GameState:
             # Broadcast updated game state to all clients
             message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content}
             self.broadcast(message)
-            print('game state update message: ' + str(message))
+            #print('game state update message: ' + str(message))
 
         
 
@@ -93,18 +93,8 @@ class Server:
 
     def handle_client(self, client, addr):
         print(f"New client connected: {addr}")
-        player_id = uuid.uuid4().hex
-        self.game_state.clients[player_id] = client
-
-        # Immediately confirm the player number back to the client
-        player_number = self.game_state.game_entities.add_player(player_id)
-        confirmation_message = {
-            'type': 'player_number_confirmed',
-            'data': {'player_id': player_id, 'player_number': player_number}
-        }
-        client.send(pickle.dumps(confirmation_message))
-        self.game_state.update_and_broadcast()  # Make sure this sends the initial game state
-
+        print('game state on player join: ' + str(self.game_state))
+        
         while True:
             try:
                 data = client.recv(4096)
@@ -112,6 +102,17 @@ class Server:
                     break
                 message = pickle.loads(data)
                 print('received message from client: ' + str(message))
+                if message['type'] == 'request_player_join':
+                    player_id = uuid.uuid4().hex
+                    self.game_state.clients[player_id] = client
+                    player_number = self.game_state.game_entities.add_player(player_id)
+                    confirmation_message = {
+                        'type': 'player_number_confirmed',
+                        'data': {'player_id': player_id, 'player_number': player_number}
+                    }
+                    client.send(pickle.dumps(confirmation_message))
+                    self.game_state.update_and_broadcast()  # Broadcast initial game state
+                    # Now listen for other messages from this client in a loop...
                 if message['type'] == 'update_player_position':
                     player_number = self.game_state.game_entities.player_numbers.get(player_id)
                     if player_number is not None:
