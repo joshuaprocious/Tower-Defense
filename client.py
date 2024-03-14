@@ -82,7 +82,7 @@ class Client:
     
     def send_message(self, message_type, data):
         with self.lock:
-            message = {'type': message_type, 'data': data}
+            message = {'type': message_type, 'data': data, 'timestamp': time.time()}
             try:
                 self.client_socket.sendto(pickle.dumps(message), self.server_address)
             except socket.error as e:
@@ -202,11 +202,11 @@ class Client:
                     next_input_time += input_sample_rate
 
 
-                if position_changed:
-                    position_dict = {'x': x, 'y': y}  # Update with new position
-                    self.send_message('update_player_position', {'player_id': self.player_id, 'position': position_dict})
-                    # Update the local game state for immediate feedback
-                    self.game_state_content['player_position'][self.player_number] = position_dict
+                    if position_changed:
+                        position_dict = {'x': x, 'y': y}  # Update with new position
+                        self.send_message('update_player_position', {'player_id': self.player_id, 'position': position_dict})
+                        # Update the local game state for immediate feedback
+                        self.game_state_content['player_position'][self.player_number] = position_dict
 
                 # Draw all players
                 self.players.draw(screen)  # Draw all player sprites in the group

@@ -60,7 +60,7 @@ class GameState:
     def update_and_broadcast(self):
         with self.lock:
             # Prepare the game state update message
-            message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content}
+            message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content, 'timestamp': time.time()}
             print('broadcasting game_state_update: ' + str(message))
             self.broadcast(message)
             #self.game_entities.broadcast_content = None
@@ -78,7 +78,7 @@ class GameState:
     def broadcast_game_state(self):
         with self.lock:
             # Broadcast updated game state to all clients
-            message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content}
+            message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content, 'timestamp': time.time()}
             self.broadcast(message)
             print('game state update message: ' + str(message))
 
@@ -120,14 +120,16 @@ class Server:
                     player_number = self.game_state.game_entities.add_player(player_id)
                     confirmation_message = {
                         'type': 'player_number_confirmed',
-                        'data': {'player_id': player_id, 'player_number': player_number, 'clients': self.game_state.clients}
+                        'data': {'player_id': player_id, 'player_number': player_number, 'clients': self.game_state.clients},
+                        'timestamp': time.time()
                     }
                     self.sock.sendto(pickle.dumps(confirmation_message), client_address)
                     print('clients: ' + str(self.game_state.clients))
                 elif message_type == 'initialize_gameloop':
                     client_ack_message = {
                         'type': 'initialize_accepted',
-                        'data': 'alright play on'
+                        'data': 'alright play on',
+                        'timestamp': time.time()
                     }
                     self.sock.sendto(pickle.dumps(client_ack_message), client_address)
                     print('initilization done for client')
