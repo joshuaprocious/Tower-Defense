@@ -147,69 +147,82 @@ class Client:
         pygame.init()
         screen = pygame.display.set_mode((1080, 920))
         clock = pygame.time.Clock()
+        time_per_update = 1/60  # 60 updates per second
+        max_accumulator = 1/30  # Allows for some catching up if needed, but limits spiral of death
+        accumulator = 0.0
+        current_time = time.time()
         print('initial game loop messages sent')
 
 
         while True and self.state == 'game loop':
+            new_time = time.time()
+            frame_time = new_time - current_time
+            current_time = new_time
+            accumulator += frame_time
+            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
 
-            screen.fill((0, 0, 0))  # Ensure this is at the start of the loop to clear the screen each frame
-            current_time = time.time()
-            if self.game_state_content and self.player_id is not None:
-                for player_sprite in self.player_sprites.values():
-                    time_since_update = current_time - player_sprite.current_time
-                    # Assuming updates come roughly every 1/60 seconds; adjust as necessary
-                    alpha = min(time_since_update * 60, 1)
-                    player_sprite.interpolate(alpha)
-                #print('message data: ' + str(self.game_state_content) + ' player id: '+ str(self.player_id) + ' player number: ' + str(self.player_number))
-                keys = pygame.key.get_pressed()
-                # Initialize x and y with current player's position to maintain it if no key is pressed
-                current_player_pos = self.game_state_content['player_position'][self.player_number]
-                x, y = current_player_pos['x'], current_player_pos['y']
+            screen.fill((0, 0, 0))  # Ensure this is at the start of the loop to clear the screen each fram
 
-                position_changed = False
+            while accumulator >= time_per_update:
+                if self.game_state_content and self.player_id is not None:
+                    for player_sprite in self.player_sprites.values():
+                        time_since_update = current_time - player_sprite.current_time
+                        # Assuming updates come roughly every 1/60 seconds; adjust as necessary
+                        alpha = min(time_since_update * 60, 1)
+                        player_sprite.interpolate(alpha)
+                    #print('message data: ' + str(self.game_state_content) + ' player id: '+ str(self.player_id) + ' player number: ' + str(self.player_number))
+                    keys = pygame.key.get_pressed()
+                    # Initialize x and y with current player's position to maintain it if no key is pressed
+                    current_player_pos = self.game_state_content['player_position'][self.player_number]
+                    x, y = current_player_pos['x'], current_player_pos['y']
 
-                # Define the base speed
-                base_speed = 3
+                    position_changed = False
 
-                # Check if the Shift key is pressed (either left or right)
-                shift_pressed = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
+                    # Define the base speed
+                    base_speed = 3
 
-                # Calculate the movement speed based on whether Shift is pressed
-                movement_speed = base_speed + 5 if shift_pressed else base_speed
+                    # Check if the Shift key is pressed (either left or right)
+                    shift_pressed = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
 
-                # Apply the movement speed to the movement logic
-                if keys[pygame.K_LEFT]:
-                    x -= movement_speed
-                    position_changed = True
-                if keys[pygame.K_RIGHT]:
-                    x += movement_speed
-                    position_changed = True
-                if keys[pygame.K_UP]:
-                    y -= movement_speed
-                    position_changed = True
-                if keys[pygame.K_DOWN]:
-                    y += movement_speed
-                    position_changed = True
+                    # Calculate the movement speed based on whether Shift is pressed
+                    movement_speed = base_speed + 5 if shift_pressed else base_speed
 
-                if position_changed:
-                    position_dict = {'x': x, 'y': y}  # Update with new position
-                    self.send_message('update_player_position', {'player_id': self.player_id, 'position': position_dict})
-                    # Update the local game state for immediate feedback
-                    self.game_state_content['player_position'][self.player_number] = position_dict
+                    # Apply the movement speed to the movement logic
+                    if keys[pygame.K_LEFT]:
+                        x -= movement_speed
+                        position_changed = True
+                    if keys[pygame.K_RIGHT]:
+                        x += movement_speed
+                        position_changed = True
+                    if keys[pygame.K_UP]:
+                        y -= movement_speed
+                        position_changed = True
+                    if keys[pygame.K_DOWN]:
+                        y += movement_speed
+                        position_changed = True
 
-                # Draw all players
+                    if position_changed:
+                        position_dict = {'x': x, 'y': y}  # Update with new position
+                        self.send_message('update_player_position', {'player_id': self.player_id, 'position': position_dict})
+                        # Update the local game state for immediate feedback
+                        self.game_state_content['player_position'][self.player_number] = position_dict
+
+                    # Draw all players
+                    #the commented code was before addition of sprite groups for player
+                    '''for player_number, pos in self.game_state_content['player_position'].items():
+                        color = self.colors[(player_number - 1) % len(self.colors)]  # Adjust color based on player number
+                        pygame.draw.rect(screen, color, (pos['x'], pos['y'], 10, 10))'''
+                    accumulator -= time_per_update
+
+                alpha = accumulator / time_per_update
                 self.players.draw(screen)  # Draw all player sprites in the group
-                #the commented code was before addition of sprite groups for player
-                '''for player_number, pos in self.game_state_content['player_position'].items():
-                    color = self.colors[(player_number - 1) % len(self.colors)]  # Adjust color based on player number
-                    pygame.draw.rect(screen, color, (pos['x'], pos['y'], 10, 10))'''
-                    
-            pygame.display.flip()
-            clock.tick(60)
+                #self.render_game(screen, alph)  # Render the game state, with interpolation
+                pygame.display.flip()
+                clock.tick(60)  # Limit to 60 FPS 
 
 if __name__ == "__main__":
     client = Client()
