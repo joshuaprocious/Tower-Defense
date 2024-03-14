@@ -50,10 +50,12 @@ class Player(pygame.sprite.Sprite):
         new_x = self.previous_position[0] + (self.current_position[0] - self.previous_position[0]) * alpha
         new_y = self.previous_position[1] + (self.current_position[1] - self.previous_position[1]) * alpha
         self.rect.topleft = (new_x, new_y)
+
 class Client:
-    def __init__(self, address='127.0.0.1', port=12345):
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((address, port))
+    def __init__(self, server_address='127.0.0.1', port=12345):
+        self.server_address = (server_address, port)
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.client_socket.bind(('0.0.0.0', 0))
         self.player_id = None  # This will now store the unique player ID sent by the server
         self.game_state_content = []  
         self.is_shooting = False
@@ -62,27 +64,38 @@ class Client:
         self.lock = threading.Lock()  # Initialize a lock
         self.players = pygame.sprite.Group()  # This will hold all player sprites
         self.player_sprites = {}  # Maps player numbers to their sprite objects
-        self.request_join()
+        self.state = 'requesting_to_join'  # Track the client's state
+        self.initialize_connection()
+        print('client init complete')
 
-
-    def request_join(self):
-        # This method sends a join request to the server.
-        self.send_message('request_player_join', {'data': 'requesting access to join game'})  # Assuming you have a method to send messages
-
+   
+    def initialize_connection(self):
+        # Send the first message and wait for an acknowledgment
+        while self.state == 'requesting_to_join':
+            self.send_message('request_player_join', {'data': 'requesting access to join game'})
+            time.sleep(0.2)
+        
+        # Wait for the state to change from "initializing"
+        while self.state == "initializing":
+            self.send_message('initialize_gameloop', 'start me up')
+            time.sleep(0.2)
+    
     def send_message(self, message_type, data):
         with self.lock:
             message = {'type': message_type, 'data': data}
             try:
-                self.client_socket.send(pickle.dumps(message))
+                self.client_socket.sendto(pickle.dumps(message), self.server_address)
             except socket.error as e:
                 print(f"Error sending message: {e}")
                 self.client_socket.close()
                 sys.exit()
 
+
     def receive_data(self):
         while True:
             try:
-                data = self.client_socket.recv(1024)
+                data, _ = self.client_socket.recvfrom(4096)
+                print('receiving data from server: ' + str(data))
                 if not data:
                     break
                 try:
@@ -98,14 +111,19 @@ class Client:
         self.client_socket.close()
 
     def process_message(self, message):
+        self.state
         with self.lock:
             message_type = message['type']
             message_data = message['data']
             if message_type == 'player_number_confirmed':
                 self.player_id = message_data['player_id']  # UUID
                 self.player_number = message_data['player_number']  # Player number
+                self.state = 'initializing'
                 print(f"Player ID {self.player_id} and Number {self.player_number} confirmed by server.")
-            elif message_type == 'game_state_update':
+            elif message_type == 'initialize_accepted':
+                print('initialize accepted received')
+                self.state = 'game loop'
+            elif message_type == 'game_state_update' and self.state == 'game loop':
                 self.game_state_content = message_data # message_data is the variable which contains type and related data (ie. {'player_position': {1: {'x': 250, 'y': 250}}})
                 self.update_player_sprites()  # Update player sprites based on game state
                 print('Game state content:', self.game_state_content)
@@ -125,11 +143,14 @@ class Client:
                 self.player_sprites[player_number].update((pos['x'], pos['y']))
 
     def game_loop(self):
+        self.state = self.state
         pygame.init()
         screen = pygame.display.set_mode((1080, 920))
         clock = pygame.time.Clock()
+        print('initial game loop messages sent')
 
-        while True:
+
+        while True and self.state == 'game loop':
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()

@@ -34,11 +34,13 @@ class GameEntities:
 
             return None
 
-    def update_player_position(self, player_number, position):
+    def update_player_position(self, player_id, position):
         with self.lock:
-            if player_number in self.player_positions:
+            player_number = self.player_numbers.get(player_id)
+            if player_number and player_number in self.player_positions:
                 self.player_positions[player_number] = position
-                self.broadcast_content = {'player_position': self.player_positions}
+                # Directly update broadcast_content here for simplicity
+                self.broadcast_content['player_position'] = self.player_positions.copy()
 
 class GameState:
     def __init__(self, server):
@@ -49,9 +51,9 @@ class GameState:
         self.lock = threading.Lock()  # Initialize a lock
 
     def broadcast(self, message):
-        for client in self.clients.values():
+        for client_address in self.clients.values():
             try:
-                client.send(pickle.dumps(message))
+                self.server.sock.sendto(pickle.dumps(message), client_address)
             except Exception as e:
                 print(f"Broadcast error: {e}")
 
@@ -78,59 +80,77 @@ class GameState:
             # Broadcast updated game state to all clients
             message = {'type': 'game_state_update', 'data': self.game_entities.broadcast_content}
             self.broadcast(message)
-            #print('game state update message: ' + str(message))
+            print('game state update message: ' + str(message))
 
         
 
 class Server:
     def __init__(self, host='0.0.0.0', port=12345):
-        self.addr = (host, port)
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(self.addr)
-        self.server_socket.listen()
+        self.server_address = (host, port)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(self.server_address)
         self.game_state = GameState(self)
         print("Server started. Waiting for connections...")
-
-    def handle_client(self, client, addr):
-        print(f"New client connected: {addr}")
-        print('game state on player join: ' + str(self.game_state))
+    
+    
+    def listen(self):
+        while True:
+            data, client_address = self.sock.recvfrom(4096)
+            if data:
+                threading.Thread(target=self.handle_client, args=(data, client_address)).start()
+    
+    def handle_client(self, client, client_address):
         
         while True:
             try:
-                data = client.recv(4096)
+                #print('true is activated in handle_client')
+                data, client_address = self.sock.recvfrom(4096)
                 if not data:
                     break
                 message = pickle.loads(data)
-                print('received message from client: ' + str(message))
-                if message['type'] == 'request_player_join':
+                player_id = None  # Define player_id outside of the conditional scopes
+                message_data = message['data']
+                message_type = message['type']
+                print('received message from client: ' +str(client_address) + str(message))
+                if message_type == 'request_player_join' and client_address not in self.game_state.clients.values():
+                    print(f"New client connected: {client_address}")
+                    print('game state on player join: ' + str(self.game_state))
                     player_id = uuid.uuid4().hex
-                    self.game_state.clients[player_id] = client
+                    self.game_state.clients[player_id] = client_address
                     player_number = self.game_state.game_entities.add_player(player_id)
                     confirmation_message = {
                         'type': 'player_number_confirmed',
-                        'data': {'player_id': player_id, 'player_number': player_number}
+                        'data': {'player_id': player_id, 'player_number': player_number, 'clients': self.game_state.clients}
                     }
-                    client.send(pickle.dumps(confirmation_message))
-                    self.game_state.update_and_broadcast()  # Broadcast initial game state
+                    self.sock.sendto(pickle.dumps(confirmation_message), client_address)
+                    print('clients: ' + str(self.game_state.clients))
+                elif message_type == 'initialize_gameloop':
+                    client_ack_message = {
+                        'type': 'initialize_accepted',
+                        'data': 'alright play on'
+                    }
+                    self.sock.sendto(pickle.dumps(client_ack_message), client_address)
+                    print('initilization done for client')
+                    threading.Thread(target=self.game_state.update_loop).start() # starts the 60 FPS game state update loop
                     # Now listen for other messages from this client in a loop...
-                if message['type'] == 'update_player_position':
-                    player_number = self.game_state.game_entities.player_numbers.get(player_id)
-                    if player_number is not None:
-                        self.game_state.game_entities.update_player_position(player_number, message['data']['position'])
-                        self.game_state.update_and_broadcast()
+                elif message['type'] == 'update_player_position':
+                    player_id = message['data']['player_id']  # Assuming the player_id is sent in the message
+                    position = message['data']['position']
+                    self.game_state.game_entities.update_player_position(player_id, position)
+                    self.game_state.update_and_broadcast()
             except Exception as e:
-                print(f"Error with client {addr}: {e}")
+                print(f"Error with client {client_address}: {e}")
                 break
 
-        client.close()
-        del self.game_state.clients[player_id]
-        print(f"Client {addr} disconnected")
+        #this code below sends responses for the UDP implementation
+        #response_data = b"Your response here"
+        #self.sock.sendto(response_data, client_address)
+        #del self.game_state.clients[player_id]
+        print(f"Client {client_address} disconnected")
 
     def start(self):
-        threading.Thread(target=self.game_state.update_loop).start() # starts the 60 FPS game state update loop
-        while True:
-            client, addr = self.server_socket.accept()
-            threading.Thread(target=self.handle_client, args=(client, addr)).start()
+        #threading.Thread(target=self.game_state.update_loop).start() # starts the 60 FPS game state update loop
+        server.listen()
 
 if __name__ == "__main__":
     server = Server()
