@@ -147,27 +147,22 @@ class Client:
         pygame.init()
         screen = pygame.display.set_mode((1080, 920))
         clock = pygame.time.Clock()
-        time_per_update = 1/60  # 60 updates per second
-        max_accumulator = 1/30  # Allows for some catching up if needed, but limits spiral of death
-        accumulator = 0.0
-        current_time = time.time()
+        
         print('initial game loop messages sent')
+
+        input_sample_rate = 1 / 60  # Target input handling rate: 60 times per second
+        next_input_time = time.time() + input_sample_rate
 
 
         while True and self.state == 'game loop':
-            new_time = time.time()
-            frame_time = new_time - current_time
-            current_time = new_time
-            accumulator += frame_time
-            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
 
-            screen.fill((0, 0, 0))  # Ensure this is at the start of the loop to clear the screen each fram
-
-            while accumulator >= time_per_update:
+            screen.fill((0, 0, 0))  # Ensure this is at the start of the loop to clear the screen each frame
+            current_time = time.time()
+            if current_time >= next_input_time:
                 if self.game_state_content and self.player_id is not None:
                     for player_sprite in self.player_sprites.values():
                         time_since_update = current_time - player_sprite.current_time
@@ -204,25 +199,25 @@ class Client:
                     if keys[pygame.K_DOWN]:
                         y += movement_speed
                         position_changed = True
+                    next_input_time += input_sample_rate
 
-                    if position_changed:
-                        position_dict = {'x': x, 'y': y}  # Update with new position
-                        self.send_message('update_player_position', {'player_id': self.player_id, 'position': position_dict})
-                        # Update the local game state for immediate feedback
-                        self.game_state_content['player_position'][self.player_number] = position_dict
 
-                    # Draw all players
-                    #the commented code was before addition of sprite groups for player
-                    '''for player_number, pos in self.game_state_content['player_position'].items():
-                        color = self.colors[(player_number - 1) % len(self.colors)]  # Adjust color based on player number
-                        pygame.draw.rect(screen, color, (pos['x'], pos['y'], 10, 10))'''
-                    accumulator -= time_per_update
+                if position_changed:
+                    position_dict = {'x': x, 'y': y}  # Update with new position
+                    self.send_message('update_player_position', {'player_id': self.player_id, 'position': position_dict})
+                    # Update the local game state for immediate feedback
+                    self.game_state_content['player_position'][self.player_number] = position_dict
 
-                alpha = accumulator / time_per_update
+                # Draw all players
                 self.players.draw(screen)  # Draw all player sprites in the group
-                #self.render_game(screen, alph)  # Render the game state, with interpolation
-                pygame.display.flip()
-                clock.tick(60)  # Limit to 60 FPS 
+                #the commented code was before addition of sprite groups for player
+                '''for player_number, pos in self.game_state_content['player_position'].items():
+                    color = self.colors[(player_number - 1) % len(self.colors)]  # Adjust color based on player number
+                    pygame.draw.rect(screen, color, (pos['x'], pos['y'], 10, 10))'''
+                if next_input_time < time.time() - input_sample_rate:
+                    next_input_time = time.time() + input_sample_rate    
+            pygame.display.flip()
+            clock.tick(60)
 
 if __name__ == "__main__":
     client = Client()
