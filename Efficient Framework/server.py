@@ -2,6 +2,7 @@ import socket
 import threading
 import time
 import datetime
+import json
 
 # Global storage for TCP client connections and UDP client addresses
 tcp_clients = {}
@@ -11,11 +12,13 @@ lock = threading.Lock()
 
 def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
     with lock:
+        # Prepare the message as a JSON string
+        json_message = json.dumps({'client_id': sender_id, 'message': message})
         # Broadcast to TCP clients
         for client_id, conn in tcp_clients.items():
             if client_id != sender_id:  # Exclude the sender for TCP
                 try:
-                    conn.sendall(message.encode())
+                    conn.sendall(json_message.encode())  # Encode JSON string to bytes before sending
                 except Exception as e:
                     print(f"Error broadcasting to TCP client {client_id}: {e}")
         
@@ -25,7 +28,7 @@ def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
                 if addr != sender_addr:  # Exclude the sender for UDP
                     try:
                         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        sock.sendto(message.encode(), addr)
+                        sock.sendto(json_message.encode(), addr)  # Encode JSON string to bytes before sending
                         sock.close()
                     except Exception as e:
                         print(f"Error broadcasting to UDP client {addr}: {e}")
@@ -47,7 +50,12 @@ def handle_tcp_client(conn, addr):
             data = conn.recv(1024).decode()
             if not data:
                 break
-            broadcast_message(client_id, f"TCP: Client {client_id}: {data}")
+            # decode json message
+            decoded_message = json.loads(data)  # Decode message from JSON
+            client_id = decoded_message['client_id']
+            message = decoded_message['message']
+            print(f"Message from TCP Client {client_id}: {message}")
+            broadcast_message(client_id, f"TCP: Client {client_id}: {message}")
     finally:
         with lock:
             del tcp_clients[client_id]
@@ -62,7 +70,9 @@ def udp_server(host, udp_port):
             with lock:
                 # Update or add the client with their last message timestamp
                 udp_clients[addr] = {'last_message_time': datetime.datetime.now()}
-            message = data.decode()
+            # decode json message
+            decoded_message = json.loads(data.decode())  # Decode message from JSON
+            message = f"{decoded_message['client_id']}: {decoded_message['message']}"
             print(f"Message from UDP Client {addr}: {message}")
             broadcast_message(None, f"UDP: {message}", is_udp=True, sender_addr=addr)
 

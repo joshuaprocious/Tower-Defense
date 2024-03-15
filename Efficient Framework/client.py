@@ -1,21 +1,35 @@
 import socket
 import threading
+import json
 
 def receive_messages(sock):
     while True:
         try:
-            message = sock.recv(1024).decode()
+            data = sock.recv(1024).decode()  # Decode bytes to string
+            if not data:
+                break
+            decoded_data = json.loads(data)  # Parse JSON string to Python dictionary
+            message = decoded_data['message']  # Access the message key
             print(f"\n{message}\nEnter your message: ", end='', flush=True)
-        except:
-            print("\nDisconnected from server.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
             break  # Exit if the server closed the connection or an error occurred
 
 def send_tcp_message(sock, message):
-    sock.sendall(message.encode())
+    # send regular encoded data
+    '''sock.sendall(message.encode())'''
+    # send json encoded
+    encoded_message = json.dumps({'client_id': client_id, 'message': message}).encode()
+    sock.sendall(encoded_message)
 
 def send_udp_message(host, udp_port, message):
+    # send regular encoded data    
+    '''with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
+        udp_sock.sendto(message.encode(), (host, udp_port))'''
+    # send json encoded
+    encoded_message = json.dumps({'client_id': client_id, 'message': message}).encode()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_sock:
-        udp_sock.sendto(message.encode(), (host, udp_port))
+        udp_sock.sendto(encoded_message, (host, udp_port))
 
 def client(host, tcp_port, udp_port, client_id):
     protocol = "TCP"  # Default protocol
