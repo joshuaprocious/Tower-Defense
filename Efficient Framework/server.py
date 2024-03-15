@@ -6,6 +6,7 @@ import datetime
 # Global storage for TCP client connections and UDP client addresses
 tcp_clients = {}
 udp_clients = {}  # Use a set to store unique client addresses
+chat_history = {}
 lock = threading.Lock()
 
 def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
@@ -28,6 +29,13 @@ def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
                         sock.close()
                     except Exception as e:
                         print(f"Error broadcasting to UDP client {addr}: {e}")
+        # add chat to chat_history dictionary
+        protocol = "UDP" if is_udp else "TCP"
+        client_key = sender_addr if is_udp else sender_id
+        if client_key not in chat_history:
+            chat_history[client_key] = []
+        timestamp_ns = time.time_ns()
+        chat_history[client_key].append((timestamp_ns, f"{protocol}: {message}"))
 
 def handle_tcp_client(conn, addr):
     client_id = conn.recv(1024).decode()
@@ -67,12 +75,25 @@ def tcp_server(host, tcp_port):
             conn, addr = tcp_sock.accept()
             threading.Thread(target=handle_tcp_client, args=(conn, addr)).start()
 
+def server_commands():
+    while True:
+        cmd = input("Server command: ")
+        if cmd == "print chat":
+            with lock:
+                for client, messages in chat_history.items():
+                    print(f"Chat history for {client}:")
+                    for timestamp_ns, message in messages:
+                        time_str = datetime.datetime.fromtimestamp(timestamp_ns / 1e9).strftime('%Y-%m-%d %H:%M:%S.%f')
+                        print(f"  {time_str} - {message}")
+                    print("----------")
+
 if __name__ == "__main__":
     HOST = '127.0.0.1'
     TCP_PORT = 12345
     UDP_PORT = 12346
     threading.Thread(target=tcp_server, args=(HOST, TCP_PORT)).start()
     threading.Thread(target=udp_server, args=(HOST, UDP_PORT)).start()
+    threading.Thread(target=server_commands).start()
 
     # Simple wait mechanism to prevent the script from exiting
     try:
