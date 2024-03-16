@@ -48,7 +48,7 @@ if __name__ == "__main__":
     HOST = 'localhost'
     TCP_PORT = 12345
     UDP_PORT = 12346
-    UDP_LISTEN_PORT = 12347
+    UDP_LISTEN_PORT = 12348
     client_id = input("Enter your client ID (1-4): ").strip()
     game = Game(HOST, TCP_PORT, UDP_PORT, UDP_LISTEN_PORT, client_id)
     game.run()

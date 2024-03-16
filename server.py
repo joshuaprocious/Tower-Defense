@@ -80,23 +80,30 @@ def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
         chat_history[client_key].append((timestamp_ns, f"{protocol}: {message}"))
 
 def handle_tcp_client(conn, addr):
-    client_id = conn.recv(1024).decode()
-    with lock:
-        tcp_clients[client_id] = conn
-    print(f"TCP Client {client_id} connected from {addr}")
+    #client_id = conn.recv(1024).decode()
     try:
-        while True:
-            data = conn.recv(1024).decode()
-            if not data:
-                break
-            # decode json message
-            decoded_message = json.loads(data)  # Decode message from JSON
-            #print('Message from TCP Client (JSON): ' + str(decoded_message))
-            client_id = decoded_message['client_id']
-            message = decoded_message['message']
-            print(f"Message from TCP Client {client_id}: {message}")
-            parse_message(decoded_message)
-            broadcast_message(client_id, f"TCP: Client {client_id}: {message}")
+        # Wait for the initial message that includes the client_id
+        initial_data = conn.recv(1024).decode()
+        initial_message = json.loads(initial_data)
+        client_id = initial_message.get('client_id')
+        with lock:
+            tcp_clients[client_id] = conn
+        print(f"TCP Client {client_id} connected from {addr}")
+        try:
+            while True:
+                data = conn.recv(1024).decode()
+                if not data:
+                    break
+                # decode json message
+                decoded_message = json.loads(data)  # Decode message from JSON
+                #print('Message from TCP Client (JSON): ' + str(decoded_message))
+                client_id = decoded_message['client_id']
+                message = decoded_message['message']
+                print(f"Message from TCP Client {client_id}: {message}")
+                parse_message(decoded_message)
+                broadcast_message(client_id, f"TCP: Client {client_id}: {message}")
+        except:
+            print('could not handle tcp client')
     finally:
         with lock:
             del tcp_clients[client_id]
@@ -142,6 +149,12 @@ def server_commands():
         elif cmd == "print player positions":
             for client_id, pos in player_positions.items():
                 print(f"Client {client_id}: Position {pos}")
+        elif cmd == "print tcp_clients":
+            for client_id in tcp_clients.items():
+                print(f"Client {client_id}")
+        elif cmd == "print udp_clients":
+            for client_id in udp_clients.items():
+                print(f"Client {client_id}")
 
 if __name__ == "__main__":
     HOST = '127.0.0.1'
