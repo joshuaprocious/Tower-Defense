@@ -44,6 +44,7 @@ def client(host, tcp_port, udp_port, client_id, udp_sock):
     tcp_sock.connect((host, tcp_port))
     tcp_sock.sendall(client_id.encode())  # Send client ID right after connecting
     send_udp_message(udp_sock, host, udp_port, client_id, message='Initialize UDP bind')
+   
 
     # Start listening threads
     threading.Thread(target=listen_tcp_messages, args=(tcp_sock,), daemon=True).start()

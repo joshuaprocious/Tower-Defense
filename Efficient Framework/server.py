@@ -3,13 +3,50 @@ import threading
 import time
 import datetime
 import json
+import ast
 
-# Global storage for TCP client connections and UDP client addresses
-tcp_clients = {}
-udp_clients = {}
-chat_history = {}
 lock = threading.Lock()
+tcp_clients = {} # list of TCP connected clients
+udp_clients = {} # list of UDP clients connected
+chat_history = {} # messages sent by each client, stored. (can get large if graphical interface introduced)
+player_positions = {}  # Global dictionary to store player positions
 
+def parse_message(decoded_message):
+    try:
+        client_id = decoded_message['client_id']
+        message = decoded_message['message']
+        print('Message to be parsed: ' + str(message))
+        
+        # Check if the message is a string representation of a dictionary
+        if isinstance(message, str):
+            # Convert the string back to a dictionary
+            # try ast.literal_eval deocding the string to dict
+            try:
+                message = ast.literal_eval(message)  # Handles Python dict format as a fallback
+            except:
+                print('Cannot process string encoded in dict')
+                pass
+        
+        # At this point, 'message' should be a dictionary
+        message_type = message['type']
+        print('decoded_message type: ' + str(message_type))
+        
+        if message_type == 'player_pos_update':
+            print('player position object received')
+            payload = message['payload']
+            x = payload['x']
+            y = payload['y']
+            update_player_position(client_id, x, y)
+    except Exception as e:
+        print(f'Not a valid object to parse: {e}')
+
+def update_player_position(client_id, x, y):
+    # if a message is passed in this format: {'type': 'player_pos_update','payload': {'x': 100,'y': 200}} it will update the player pos
+    print('updating player positions')
+    player_positions[client_id] = {'x': x, 'y': y}
+
+# This is the server and listener for TCP and UDP messages. 
+# Returns decoded_message which is the dictionary starting with "client_id"
 def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
     with lock:
         # Prepare the message as a JSON string
@@ -53,10 +90,11 @@ def handle_tcp_client(conn, addr):
                 break
             # decode json message
             decoded_message = json.loads(data)  # Decode message from JSON
-            print('Message from TCP Client (JSON): ' + str(decoded_message))
+            #print('Message from TCP Client (JSON): ' + str(decoded_message))
             client_id = decoded_message['client_id']
             message = decoded_message['message']
             print(f"Message from TCP Client {client_id}: {message}")
+            parse_message(decoded_message)
             broadcast_message(client_id, f"TCP: Client {client_id}: {message}")
     finally:
         with lock:
@@ -74,9 +112,10 @@ def udp_server(host, udp_port):
                 udp_clients[addr] = {'last_message_time': datetime.datetime.now()}
             # decode json message
             decoded_message = json.loads(data.decode())  # Decode message from JSON
-            print('Message from UDP Client (JSON): ' + str(decoded_message))
+            #print('Message from UDP Client (JSON): ' + str(decoded_message))
             message = f"{decoded_message['client_id']}: {decoded_message['message']}"
             print(f"Message from UDP Client {addr}: {message}")
+            parse_message(decoded_message)
             broadcast_message(None, f"UDP: {message}", is_udp=True, sender_addr=addr)
 
 def tcp_server(host, tcp_port):
@@ -99,6 +138,9 @@ def server_commands():
                         time_str = datetime.datetime.fromtimestamp(timestamp_ns / 1e9).strftime('%Y-%m-%d %H:%M:%S.%f')
                         print(f"  {time_str} - {message}")
                     print("----------")
+        elif cmd == "print player positions":
+            for client_id, pos in player_positions.items():
+                print(f"Client {client_id}: Position {pos}")
 
 if __name__ == "__main__":
     HOST = '127.0.0.1'
