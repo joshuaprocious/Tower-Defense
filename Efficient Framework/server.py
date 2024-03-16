@@ -11,11 +11,12 @@ udp_clients = {} # list of UDP clients connected
 chat_history = {} # messages sent by each client, stored. (can get large if graphical interface introduced)
 player_positions = {}  # Global dictionary to store player positions
 
+# parse messages lie this format: {'type': 'player_pos_update','payload': {'x': 100,'y': 200}}
 def parse_message(decoded_message):
     try:
         client_id = decoded_message['client_id']
         message = decoded_message['message']
-        print('Message to be parsed: ' + str(message))
+        #print('Message to be parsed: ' + str(message))
         
         # Check if the message is a string representation of a dictionary
         if isinstance(message, str):
@@ -29,19 +30,19 @@ def parse_message(decoded_message):
         
         # At this point, 'message' should be a dictionary
         message_type = message['type']
-        print('decoded_message type: ' + str(message_type))
+        #print('decoded_message type: ' + str(message_type))
         
         if message_type == 'player_pos_update':
-            print('player position object received')
+            #print('player position object received')
             payload = message['payload']
             x = payload['x']
             y = payload['y']
             update_player_position(client_id, x, y)
     except Exception as e:
-        print(f'Not a valid object to parse: {e}')
+        #print(f'Not a valid object to parse: {e}')
+        pass
 
 def update_player_position(client_id, x, y):
-    # if a message is passed in this format: {'type': 'player_pos_update','payload': {'x': 100,'y': 200}} it will update the player pos
     print('updating player positions')
     player_positions[client_id] = {'x': x, 'y': y}
 
