@@ -12,10 +12,10 @@ def listen_udp_messages(udp_sock):
             print(f"\nError receiving UDP message: {e}")
             break
 
-def listen_tcp_messages(sock):
+def listen_tcp_messages(tcp_sock):
     while True:
         try:
-            data = sock.recv(1024).decode()
+            data = tcp_sock.recv(1024).decode()
             if not data:
                 break
             decoded_data = json.loads(data)
@@ -24,9 +24,9 @@ def listen_tcp_messages(sock):
             print(f"\nError receiving TCP message: {e}")
             break
 
-def send_tcp_message(sock, client_id, message):
+def send_tcp_message(tcp_sock, client_id, message):
     encoded_message = json.dumps({'client_id': client_id, 'message': message}).encode()
-    sock.sendall(encoded_message)
+    tcp_sock.sendall(encoded_message)
 
 def send_udp_message(udp_sock, host, udp_port, client_id, message):
     encoded_message = json.dumps({'client_id': client_id, 'message': message}).encode()
@@ -38,11 +38,14 @@ def init_udp_socket(udp_listen_port):
     udp_sock.bind(('', udp_listen_port))  # Bind to the specific port
     return udp_sock
 
-def client(host, tcp_port, udp_port, client_id, udp_sock):
-    # TCP Setup
+def init_tcp_connection(host, tcp_port):
     tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcp_sock.connect((host, tcp_port))
-    tcp_sock.sendall(client_id.encode())  # Send client ID right after connecting
+    return tcp_sock
+
+def client(host, tcp_port, udp_port, client_id, udp_sock, tcp_sock):
+    # TCP Setup
+    send_tcp_message(tcp_sock, client_id, message='client id send')  # Send client ID right after connecting
     send_udp_message(udp_sock, host, udp_port, client_id, message='Initialize UDP bind')
    
 
@@ -52,7 +55,7 @@ def client(host, tcp_port, udp_port, client_id, udp_sock):
 
     protocol = "TCP"  # Default protocol
     print("Connected via TCP. Use '/udp' to switch to UDP, '/tcp' to switch back to TCP.")
-
+    
     while True:
         message = input(f"{protocol}> ")
         if message.lower() == "/udp":
@@ -75,7 +78,11 @@ if __name__ == "__main__":
 
     client_id = input("Enter your client ID (1-4): ").strip()
     udp_sock = init_udp_socket(UDP_LISTEN_PORT)
-    client(HOST, TCP_PORT, UDP_PORT, client_id, udp_sock)
+    tcp_sock = init_tcp_connection(HOST, TCP_PORT)
+    client(HOST, TCP_PORT, UDP_PORT, client_id, udp_sock, tcp_sock)
+
+
+ 
 
 
 
