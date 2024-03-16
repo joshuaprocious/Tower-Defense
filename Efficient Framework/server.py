@@ -6,7 +6,7 @@ import json
 
 # Global storage for TCP client connections and UDP client addresses
 tcp_clients = {}
-udp_clients = {}  # Use a set to store unique client addresses
+udp_clients = {}
 chat_history = {}
 lock = threading.Lock()
 
@@ -53,6 +53,7 @@ def handle_tcp_client(conn, addr):
                 break
             # decode json message
             decoded_message = json.loads(data)  # Decode message from JSON
+            print('Message from TCP Client (JSON): ' + str(decoded_message))
             client_id = decoded_message['client_id']
             message = decoded_message['message']
             print(f"Message from TCP Client {client_id}: {message}")
@@ -73,6 +74,7 @@ def udp_server(host, udp_port):
                 udp_clients[addr] = {'last_message_time': datetime.datetime.now()}
             # decode json message
             decoded_message = json.loads(data.decode())  # Decode message from JSON
+            print('Message from UDP Client (JSON): ' + str(decoded_message))
             message = f"{decoded_message['client_id']}: {decoded_message['message']}"
             print(f"Message from UDP Client {addr}: {message}")
             broadcast_message(None, f"UDP: {message}", is_udp=True, sender_addr=addr)
