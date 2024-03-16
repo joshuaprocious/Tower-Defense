@@ -69,7 +69,7 @@ if __name__ == "__main__":
     HOST = 'localhost'
     TCP_PORT = 12345
     UDP_PORT = 12346
-    UDP_LISTEN_PORT = 12347  # Example port, adjust as necessary for your setup
+    UDP_LISTEN_PORT = 12348  # Example port, adjust as necessary for your setup
 
     client_id = input("Enter your client ID (1-4): ").strip()
     udp_sock = init_udp_socket(UDP_LISTEN_PORT)

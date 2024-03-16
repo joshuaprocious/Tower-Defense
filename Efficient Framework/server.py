@@ -14,13 +14,14 @@ def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
     with lock:
         # Prepare the message as a JSON string
         json_message = json.dumps({'client_id': sender_id, 'message': message})
-        # Broadcast to TCP clients
-        for client_id, conn in tcp_clients.items():
-            if client_id != sender_id:  # Exclude the sender for TCP
-                try:
-                    conn.sendall(json_message.encode())  # Encode JSON string to bytes before sending
-                except Exception as e:
-                    print(f"Error broadcasting to TCP client {client_id}: {e}")
+        if is_udp == False:
+            # Broadcast to TCP clients
+            for client_id, conn in tcp_clients.items():
+                if client_id != sender_id:  # Exclude the sender for TCP
+                    try:
+                        conn.sendall(json_message.encode())  # Encode JSON string to bytes before sending
+                    except Exception as e:
+                        print(f"Error broadcasting to TCP client {client_id}: {e}")
         
         # Broadcast to UDP clients, if the message comes from a UDP client
         if is_udp:
