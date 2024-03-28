@@ -25,18 +25,18 @@ def parse_message(decoded_message):
             try:
                 message = ast.literal_eval(message)  # Handles Python dict format as a fallback
             except:
-                print('Cannot process string encoded in dict')
+                #print('Cannot process string encoded in dict')
                 pass
         
         # At this point, 'message' should be a dictionary
-        message_type = message['type']
-        #print('decoded_message type: ' + str(message_type))
+        message_type = decoded_message['type']
+        print('decoded_message type: ' + str(message_type))
+        print('message state before processing: ' + str(message))
         
         if message_type == 'player_pos_update':
             #print('player position object received')
-            payload = message['payload']
-            x = payload['x']
-            y = payload['y']
+            x , y = message
+            print('x: ' + str(x) + ' y: ' + str(y))
             update_player_position(client_id, x, y)
     except Exception as e:
         #print(f'Not a valid object to parse: {e}')
@@ -45,6 +45,8 @@ def parse_message(decoded_message):
 def update_player_position(client_id, x, y):
     print('updating player positions')
     player_positions[client_id] = {'x': x, 'y': y}
+    message = {'type': 'player_positions', 'message': player_positions}
+    broadcast_message('server', message, is_udp=True)
 
 # This is the server and listener for TCP and UDP messages. 
 # Returns decoded_message which is the dictionary starting with "client_id"
@@ -58,6 +60,7 @@ def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
                 if client_id != sender_id:  # Exclude the sender for TCP
                     try:
                         conn.sendall(json_message.encode())  # Encode JSON string to bytes before sending
+                        print('sent tcp message: ' + str(json_message))
                     except Exception as e:
                         print(f"Error broadcasting to TCP client {client_id}: {e}")
         
@@ -68,6 +71,8 @@ def broadcast_message(sender_id, message, is_udp=False, sender_addr=None):
                     try:
                         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                         sock.sendto(json_message.encode(), addr)  # Encode JSON string to bytes before sending
+                        print('sent udp message: ' + str(json_message))
+                        is_udp=False
                         sock.close()
                     except Exception as e:
                         print(f"Error broadcasting to UDP client {addr}: {e}")
@@ -99,7 +104,7 @@ def handle_tcp_client(conn, addr):
                 #print('Message from TCP Client (JSON): ' + str(decoded_message))
                 client_id = decoded_message['client_id']
                 message = decoded_message['message']
-                print(f"Message from TCP Client {client_id}: {message}")
+                print(f"Message from TCP Client {client_id}: {decoded_message}")
                 parse_message(decoded_message)
                 broadcast_message(client_id, f"TCP: Client {client_id}: {message}")
         except:
@@ -149,6 +154,7 @@ def server_commands():
         elif cmd == "print player positions":
             for client_id, pos in player_positions.items():
                 print(f"Client {client_id}: Position {pos}")
+                print('raw play pos dictionary: ' + str(player_positions))
         elif cmd == "print tcp_clients":
             for client_id in tcp_clients.items():
                 print(f"Client {client_id}")
