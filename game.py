@@ -65,6 +65,11 @@ class Game:
         # Send the current player position to the server
         message = {'client_id': self.client_id, 'type': 'player_pos_update', 'message': self.player_pos}
         self.network_client.send_tcp_message(message)
+    
+    def send_player_position_udp(self):
+        # Send the current player position to the server
+        message = {'client_id': self.client_id, 'type': 'player_pos_update', 'message': self.player_pos}
+        self.network_client.send_udp_message(message)
 
     def game_loop(self):
         clock = pygame.time.Clock()
@@ -90,17 +95,17 @@ class Game:
                 self.player_pos[0] += self.player_speed
             
             # Send updated position to the server
-            self.send_player_position_tcp()
-            print('post player send')
+            self.send_player_position_udp()
+            #print('post player send')
             # Render
             self.screen.fill((0, 0, 0))  # Clear screen
-            print('cleared the screen')
+            #print('cleared the screen')
             for client_id, (x, y) in self.players.items():  # Unpack positions directly
-                print('passed for loop in render')
+                #print('passed for loop in render')
                 color = self.player_color.get(client_id, (255, 255, 255))  # Default to white if ID not found
-                print('assigned color')
+                #print('assigned color')
                 pygame.draw.rect(self.screen, color, (x, y, *self.player_size))
-                print('drew rects')
+                #print('drew rects')
             pygame.display.flip()
             
             clock.tick(60)  # Cap at 60 FPS

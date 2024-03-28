@@ -163,7 +163,7 @@ def server_commands():
                 print(f"Client {client_id}")
 
 if __name__ == "__main__":
-    HOST = '127.0.0.1'
+    HOST = '0.0.0.0'
     TCP_PORT = 12345
     UDP_PORT = 12346
     threading.Thread(target=tcp_server, args=(HOST, TCP_PORT)).start()
